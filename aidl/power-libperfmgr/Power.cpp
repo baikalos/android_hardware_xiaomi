@@ -79,7 +79,7 @@ Power::Power()
 }
 
 ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
-    LOG(DEBUG) << "Power setMode: " << toString(type) << " to: " << enabled;
+    LOG(INFO) << "Power setMode: " << toString(type) << " to: " << enabled;
     if (HintManager::GetInstance()->GetAdpfProfile() &&
         HintManager::GetInstance()->GetAdpfProfile()->mReportingRateLimitNs > 0) {
         PowerSessionManager::getInstance()->updateHintMode(toString(type), enabled);
@@ -90,35 +90,37 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
     }
 #endif
     switch (type) {
+
 #ifdef TAP_TO_WAKE_NODE
         case Mode::DOUBLE_TAP_TO_WAKE:
             ::android::base::WriteStringToFile(enabled ? "1" : "0", TAP_TO_WAKE_NODE, true);
             break;
 #endif
+
         case Mode::SUSTAINED_PERFORMANCE:
-            if (enabled) {
-                HintManager::GetInstance()->DoHint("SUSTAINED_PERFORMANCE");
-            }
-            mSustainedPerfModeOn = true;
-            break;
-        case Mode::LAUNCH:
-            if (mSustainedPerfModeOn) {
-                break;
-            }
             [[fallthrough]];
-#ifndef TAP_TO_WAKE_NODE
-        case Mode::DOUBLE_TAP_TO_WAKE:
-            [[fallthrough]];
-#endif
         case Mode::FIXED_PERFORMANCE:
             [[fallthrough]];
         case Mode::EXPENSIVE_RENDERING:
             [[fallthrough]];
-        case Mode::INTERACTIVE:
-            [[fallthrough]];
         case Mode::DEVICE_IDLE:
             [[fallthrough]];
         case Mode::DISPLAY_INACTIVE:
+            mSustainedPerfModeOn = enabled;
+            if (enabled) {
+                HintManager::GetInstance()->DoHint(toString(type));
+            } else {
+                HintManager::GetInstance()->EndHint(toString(type));
+            }
+            break;
+
+#ifndef TAP_TO_WAKE_NODE
+        case Mode::DOUBLE_TAP_TO_WAKE:
+            [[fallthrough]];
+#endif
+        case Mode::LAUNCH:
+            [[fallthrough]];
+        case Mode::INTERACTIVE:
             [[fallthrough]];
         case Mode::AUDIO_STREAMING_LOW_LATENCY:
             [[fallthrough]];
