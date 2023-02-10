@@ -97,15 +97,11 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             break;
 #endif
 
+        case Mode::DEVICE_IDLE:
+            [[fallthrough]];
         case Mode::SUSTAINED_PERFORMANCE:
             [[fallthrough]];
         case Mode::FIXED_PERFORMANCE:
-            [[fallthrough]];
-        case Mode::EXPENSIVE_RENDERING:
-            [[fallthrough]];
-        case Mode::DEVICE_IDLE:
-            [[fallthrough]];
-        case Mode::DISPLAY_INACTIVE:
             mSustainedPerfModeOn = enabled;
             if (enabled) {
                 HintManager::GetInstance()->DoHint(toString(type));
@@ -116,14 +112,27 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
 
 #ifndef TAP_TO_WAKE_NODE
         case Mode::DOUBLE_TAP_TO_WAKE:
-            [[fallthrough]];
+            if (enabled) {
+                HintManager::GetInstance()->DoHint(toString(type));
+            } else {
+                HintManager::GetInstance()->EndHint(toString(type));
+            }
+            break;
 #endif
-        case Mode::LAUNCH:
+
+        case Mode::LOW_POWER:
             [[fallthrough]];
         case Mode::INTERACTIVE:
             [[fallthrough]];
+        case Mode::EXPENSIVE_RENDERING:
+            [[fallthrough]];
+        case Mode::LAUNCH:
+            [[fallthrough]];
         case Mode::AUDIO_STREAMING_LOW_LATENCY:
             [[fallthrough]];
+        case Mode::DISPLAY_INACTIVE:
+            [[fallthrough]];
+            //break;
         default:
             if (enabled) {
                 HintManager::GetInstance()->DoHint(toString(type));
