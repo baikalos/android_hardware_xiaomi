@@ -97,6 +97,8 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             break;
 #endif
 
+        case Mode::LOW_POWER:
+            [[fallthrough]];
         case Mode::DEVICE_IDLE:
             [[fallthrough]];
         case Mode::SUSTAINED_PERFORMANCE:
@@ -120,10 +122,12 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             break;
 #endif
 
-        case Mode::LOW_POWER:
-            [[fallthrough]];
         case Mode::INTERACTIVE:
+            if( enabled ) {
+                mSustainedPerfModeOn = false;
+            } 
             [[fallthrough]];
+
         case Mode::EXPENSIVE_RENDERING:
             [[fallthrough]];
         case Mode::LAUNCH:
@@ -131,8 +135,12 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
         case Mode::AUDIO_STREAMING_LOW_LATENCY:
             [[fallthrough]];
         case Mode::DISPLAY_INACTIVE:
-            [[fallthrough]];
+            //[[fallthrough]];
             //break;
+            if( mSustainedPerfModeOn ) {
+                break;
+            }
+
         default:
             if (enabled) {
                 HintManager::GetInstance()->DoHint(toString(type));
