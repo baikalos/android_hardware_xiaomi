@@ -169,7 +169,7 @@ ndk::ScopedAStatus Power::isModeSupported(Mode type, bool *_aidl_return) {
 }
 
 ndk::ScopedAStatus Power::setBoost(Boost type, int32_t durationMs) {
-    LOG(DEBUG) << "Power setBoost: " << toString(type) << " duration: " << durationMs;
+    LOG(INFO) << "Power setBoost: " << toString(type) << " duration: " << durationMs;
     if (HintManager::GetInstance()->GetAdpfProfile() &&
         HintManager::GetInstance()->GetAdpfProfile()->mReportingRateLimitNs > 0) {
         PowerSessionManager::getInstance()->updateHintBoost(toString(type), durationMs);
