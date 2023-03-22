@@ -52,7 +52,9 @@ constexpr char kPowerHalRenderingProp[] = "vendor.powerhal.rendering";
 
 Power::Power()
     : mInteractionHandler(nullptr),
-      mSustainedPerfModeOn(false) {
+      mSustainedPerfModeOn(false),
+      mDisplayStateImminentDisabled(false),
+      mInteractionBoostDisabled(false) {
     mInteractionHandler = std::make_unique<InteractionHandler>();
     mInteractionHandler->Init();
 
@@ -90,15 +92,20 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
     }
 #endif
     switch (type) {
-
 #ifdef TAP_TO_WAKE_NODE
         case Mode::DOUBLE_TAP_TO_WAKE:
             ::android::base::WriteStringToFile(enabled ? "1" : "0", TAP_TO_WAKE_NODE, true);
             break;
+#else
+        case Mode::DOUBLE_TAP_TO_WAKE:
+            if (enabled) {
+                HintManager::GetInstance()->DoHint(toString(type));
+            } else {
+                HintManager::GetInstance()->EndHint(toString(type));
+            }
+            break;
 #endif
 
-        case Mode::LOW_POWER:
-            [[fallthrough]];
         case Mode::DEVICE_IDLE:
             [[fallthrough]];
         case Mode::SUSTAINED_PERFORMANCE:
@@ -112,21 +119,14 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             }
             break;
 
-#ifndef TAP_TO_WAKE_NODE
-        case Mode::DOUBLE_TAP_TO_WAKE:
-            if (enabled) {
-                HintManager::GetInstance()->DoHint(toString(type));
-            } else {
-                HintManager::GetInstance()->EndHint(toString(type));
-            }
-            break;
-#endif
-
+        case Mode::LOW_POWER:
+            [[fallthrough]];
         case Mode::INTERACTIVE:
             if( enabled ) {
                 mSustainedPerfModeOn = false;
             } 
             [[fallthrough]];
+
         case Mode::EXPENSIVE_RENDERING:
             [[fallthrough]];
         case Mode::LAUNCH:
@@ -134,11 +134,11 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
         case Mode::AUDIO_STREAMING_LOW_LATENCY:
             [[fallthrough]];
         case Mode::DISPLAY_INACTIVE:
+            [[fallthrough]];
+        default:
             if( enabled && mSustainedPerfModeOn ) {
                 break;
             }
-            [[fallthrough]];
-        default:
             if (enabled) {
                 HintManager::GetInstance()->DoHint(toString(type));
             } else {
@@ -146,7 +146,6 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             }
             break;
     }
-
     return ndk::ScopedAStatus::ok();
 }
 
@@ -169,19 +168,26 @@ ndk::ScopedAStatus Power::isModeSupported(Mode type, bool *_aidl_return) {
 }
 
 ndk::ScopedAStatus Power::setBoost(Boost type, int32_t durationMs) {
-    LOG(INFO) << "Power setBoost: " << toString(type) << " duration: " << durationMs;
+    //LOG(INFO) << "Power setBoost: " << toString(type) << " duration: " << durationMs;
     if (HintManager::GetInstance()->GetAdpfProfile() &&
         HintManager::GetInstance()->GetAdpfProfile()->mReportingRateLimitNs > 0) {
         PowerSessionManager::getInstance()->updateHintBoost(toString(type), durationMs);
     }
     switch (type) {
         case Boost::INTERACTION:
-            /*if (mSustainedPerfModeOn) {
+            if( durationMs == -1000 ) { mInteractionBoostDisabled = true; break; }
+            else if( durationMs == -1001 ) { mInteractionBoostDisabled = false; break; }
+            if( mInteractionBoostDisabled ) break;
+            if (mSustainedPerfModeOn) {
                 break;
-            }*/
+            }
             mInteractionHandler->Acquire(durationMs);
+
             break;
         case Boost::DISPLAY_UPDATE_IMMINENT:
+            if( durationMs == -1000 ) { mDisplayStateImminentDisabled = true; break; }
+            else if( durationMs == -1001 ) { mDisplayStateImminentDisabled = false; break; }
+            if( mDisplayStateImminentDisabled ) break;
             [[fallthrough]];
         case Boost::ML_ACC:
             [[fallthrough]];
@@ -201,7 +207,6 @@ ndk::ScopedAStatus Power::setBoost(Boost type, int32_t durationMs) {
             }
             break;
     }
-
     return ndk::ScopedAStatus::ok();
 }
 
@@ -259,7 +264,6 @@ ndk::ScopedAStatus Power::getHintSessionPreferredRate(int64_t *outNanoseconds) {
     if (*outNanoseconds <= 0) {
         return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
-
     return ndk::ScopedAStatus::ok();
 }
 
