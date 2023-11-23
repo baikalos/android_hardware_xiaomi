@@ -54,6 +54,7 @@ class Power : public ::aidl::android::hardware::power::BnPower {
     std::atomic<bool> mSustainedPerfModeOn;
     std::atomic<bool> mDisplayStateImminentDisabled;
     std::atomic<bool> mInteractionBoostDisabled;
+    std::atomic<bool> mRenderingBoostDisabled;
 
 };
 

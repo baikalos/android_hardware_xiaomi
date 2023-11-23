@@ -81,7 +81,7 @@ Power::Power()
 }
 
 ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
-    LOG(INFO) << "Power setMode: " << toString(type) << " to: " << enabled;
+    LOG(DEBUG) << "Power setMode: " << toString(type) << " to: " << enabled;
     if (HintManager::GetInstance()->GetAdpfProfile() &&
         HintManager::GetInstance()->GetAdpfProfile()->mReportingRateLimitNs > 0) {
         PowerSessionManager::getInstance()->updateHintMode(toString(type), enabled);
@@ -106,8 +106,6 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             break;
 #endif
 
-        case Mode::DEVICE_IDLE:
-            [[fallthrough]];
         case Mode::SUSTAINED_PERFORMANCE:
             [[fallthrough]];
         case Mode::FIXED_PERFORMANCE:
@@ -119,6 +117,19 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
             }
             break;
 
+        case Mode::EXPENSIVE_RENDERING:
+            if( enabled && mRenderingBoostDisabled ) break;
+            if( enabled && mSustainedPerfModeOn ) break;
+
+            if (enabled) {
+                HintManager::GetInstance()->DoHint(toString(type));
+            } else {
+                HintManager::GetInstance()->EndHint(toString(type));
+            }
+            break;
+
+        case Mode::DEVICE_IDLE:
+            [[fallthrough]];
         case Mode::LOW_POWER:
             [[fallthrough]];
         case Mode::INTERACTIVE:
@@ -126,12 +137,9 @@ ndk::ScopedAStatus Power::setMode(Mode type, bool enabled) {
                 mSustainedPerfModeOn = false;
             } 
             [[fallthrough]];
-
-        case Mode::EXPENSIVE_RENDERING:
+        case Mode::AUDIO_STREAMING_LOW_LATENCY:
             [[fallthrough]];
         case Mode::LAUNCH:
-            [[fallthrough]];
-        case Mode::AUDIO_STREAMING_LOW_LATENCY:
             [[fallthrough]];
         case Mode::DISPLAY_INACTIVE:
             [[fallthrough]];
@@ -169,7 +177,8 @@ ndk::ScopedAStatus Power::isModeSupported(Mode type, bool *_aidl_return) {
 
 ndk::ScopedAStatus Power::setBoost(Boost type, int32_t durationMs) {
     //LOG(INFO) << "Power setBoost: " << toString(type) << " duration: " << durationMs;
-    if (HintManager::GetInstance()->GetAdpfProfile() &&
+    if ( durationMs > -1000 && 
+        HintManager::GetInstance()->GetAdpfProfile() &&
         HintManager::GetInstance()->GetAdpfProfile()->mReportingRateLimitNs > 0) {
         PowerSessionManager::getInstance()->updateHintBoost(toString(type), durationMs);
     }
@@ -177,6 +186,10 @@ ndk::ScopedAStatus Power::setBoost(Boost type, int32_t durationMs) {
         case Boost::INTERACTION:
             if( durationMs == -1000 ) { mInteractionBoostDisabled = true; break; }
             else if( durationMs == -1001 ) { mInteractionBoostDisabled = false; break; }
+
+            if( durationMs == -1002 ) { mRenderingBoostDisabled = true; break; }
+            else if( durationMs == -1003 ) { mRenderingBoostDisabled = false; break; }
+
             if( mInteractionBoostDisabled ) break;
             if (mSustainedPerfModeOn) {
                 break;
@@ -188,6 +201,7 @@ ndk::ScopedAStatus Power::setBoost(Boost type, int32_t durationMs) {
             if( durationMs == -1000 ) { mDisplayStateImminentDisabled = true; break; }
             else if( durationMs == -1001 ) { mDisplayStateImminentDisabled = false; break; }
             if( mDisplayStateImminentDisabled ) break;
+
             [[fallthrough]];
         case Boost::ML_ACC:
             [[fallthrough]];
